@@ -18,11 +18,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout code
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. Configure AWS credentials
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -30,42 +28,34 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # 3. Login to ECR using your URI secret
       - name: Login to Amazon ECR
         run: |
           aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ECR_LOGIN_URI
 
-      # 4. Build Docker image
       - name: Build Docker image
         run: |
           docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
 
-      # 5. Tag image for ECR
       - name: Tag Docker image
         run: |
           docker tag $ECR_REPOSITORY:$IMAGE_TAG $AWS_ECR_LOGIN_URI/$ECR_REPOSITORY:$IMAGE_TAG
 
-      # 6. Push image to ECR
       - name: Push Docker image
         run: |
           docker push $AWS_ECR_LOGIN_URI/$ECR_REPOSITORY:$IMAGE_TAG
 
-      # 7. Update ECS task definition
       - name: Render ECS task definition
         id: task-def
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
-          task-definition: ${{ secrets.ECS_TASK_DEFINITION }}
-          container-name: ${{ secrets.CONTAINER_NAME }}
-          image: ${{ secrets.AWS_ECR_LOGIN_URI }}/${{ secrets.ECR_REPOSITORY_NAME }}:${{ github.sha }}
+          task-definition: task-definition.json
+          container-name: studentperformance
+          image: ${{ env.AWS_ECR_LOGIN_URI }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
 
-      # 8. Deploy to ECS
       - name: Deploy to ECS
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
         with:
           task-definition: ${{ steps.task-def.outputs.task-definition }}
           service: ${{ secrets.ECS_SERVICE }}
           cluster: ${{ secrets.ECS_CLUSTER }}
-          wait-for-service-stability: true          
-
-
+          wait-for-service-stability: true
